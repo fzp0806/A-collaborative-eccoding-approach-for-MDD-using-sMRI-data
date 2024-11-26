@@ -167,7 +167,7 @@ def GM_loss(Models, gm, train_loader, sites, local_site):
 
     return gm_loss
 
-def local_reg_loss(Models, hypermodel, train_loader, sites, local_site):
+def local_fvd_loss(Models, hypermodel, train_loader, sites, local_site):
     GW = torch.zeros([len(sites)-1, 2]).cuda()
     regularization_terms = Cal_site_Gwstar(Models, train_loader, sites, local_site)
     GWstar = torch.cat(regularization_terms['GWstar'])#t*c
@@ -188,12 +188,12 @@ def local_reg_loss(Models, hypermodel, train_loader, sites, local_site):
     cross_term = torch.matmul(torch.matmul(GW.unsqueeze(1), precision), GWstar.unsqueeze(-1))#(t*1*c) matmul (t*c*c) matmul (t*c*1)
     square_term = torch.matmul(torch.matmul(GW.unsqueeze(1), precision), GW.unsqueeze(-1))
     square_star_term = torch.matmul(torch.matmul(GWstar.unsqueeze(1), precision), GWstar.unsqueeze(-1))
-    task_reg_loss = (square_term - 2*cross_term + square_star_term).sum(dim=[1,2]) 
-    task_reg_loss += (1/((precision+1e-4*identity).det())).log()
-    reg_loss = task_reg_loss.sum()# sum task
-    return reg_loss
+    all_fvd_loss = (square_term - 2*cross_term + square_star_term).sum(dim=[1,2]) 
+    all_fvd_loss += (1/((precision+1e-4*identity).det())).log()
+    fvd_loss = task_fvd_loss.sum()# sum task
+    return fvd_loss
 
-def global_reg_loss(Models, global_model, hypermodel, train_loader, sites):
+def global_fvd_loss(Models, global_model, hypermodel, train_loader, sites):
     GW = torch.zeros(len(sites), 2).cuda()
     regularization_terms = Cal_global_Gwstar(Models, train_loader, sites)
     GWstar = torch.cat(regularization_terms['GWstar'])#t*c
@@ -213,10 +213,10 @@ def global_reg_loss(Models, global_model, hypermodel, train_loader, sites):
     cross_term = torch.matmul(torch.matmul(GW.unsqueeze(1), precision), GWstar.unsqueeze(-1))#(t*1*c) matmul (t*c*c) matmul (t*c*1)
     square_term = torch.matmul(torch.matmul(GW.unsqueeze(1), precision), GW.unsqueeze(-1))
     square_star_term = torch.matmul(torch.matmul(GWstar.unsqueeze(1), precision), GWstar.unsqueeze(-1))
-    task_reg_loss = (square_term - 2*cross_term + square_star_term).sum(dim=[1,2]) 
-    task_reg_loss += (1/((precision+1e-4*identity).det())).log()
-    reg_loss = task_reg_loss.sum()# sum task
-    return reg_loss
+    all_fvd_loss = (square_term - 2*cross_term + square_star_term).sum(dim=[1,2]) 
+    all_fvd_loss += (1/((precision+1e-4*identity).det())).log()
+    fvd_loss = all_fvd_loss.sum()# sum task
+    return fvd_loss
 
 def Cal_global_Gwstar(Models, train_loader, sites):
     regularization_terms = {}
