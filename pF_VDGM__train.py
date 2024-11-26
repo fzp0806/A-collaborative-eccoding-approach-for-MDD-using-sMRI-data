@@ -36,9 +36,9 @@ import argparse
 import torch.backends.cudnn as cudnn
 # from torch.nn.parallel import gather
 from sklearn.metrics import roc_curve
-from Reg_loss import global_reg_loss, local_reg_loss, GM_loss
+from Fed_loss import global_fvd_loss, local_fvd_loss, GM_loss
 from torch.utils.data import ConcatDataset
-def Meta_Training(localmodel, data, label, criterion=None):
+def Training(localmodel, data, label, criterion=None):
     # Federated training process  
     localmodel.train()
     torch.cuda.empty_cache()
@@ -213,11 +213,11 @@ def main_worker(args):
 
             Best_Acc[site] = 0.0
             Best_global_Acc[site] = 0.0
-        # Strat Meta-LocalTraining
+        # Strat LocalTraining
         
         for epoch in range(args.epoch):
             epoch_start_time = time.time()
-            logger.info('Meta-Training  epoch:{}/{}'.format(epoch+1, args.epoch))
+            logger.info('Training  epoch:{}/{}'.format(epoch+1, args.epoch))
             #Initial records for each epoch
             Labels = {}
             preds = {}
@@ -236,9 +236,7 @@ def main_worker(args):
                 test_preds[site] = []
                 local_train_loss[site] = 0.0
                 local_test_loss[site] = 0.0
-            # Load Meta-Batch Data from each site
-            
-            process = 'train_scaffold'
+            # Load Batch Data from each site
             torch.cuda.empty_cache()
            
             for site in range(5):      
@@ -246,18 +244,18 @@ def main_worker(args):
                 for iters in range(len(train_iter)): 
                     batch_train_data[site], batch_train_label[site] = next(train_iter)
                     batch_train_data[site], batch_train_label[site] = batch_train_data[site].cuda(), batch_train_label[site].cuda()
-                    output, loss_cls, out_fc = Meta_Training(Models[site], batch_train_data[site], batch_train_label[site],  criterion=CE, device=device, phase=process)
+                    output, loss_cls, out_fc = Training(Models[site], batch_train_data[site], batch_train_label[site],  criterion=CE, device=device, phase=process)
 
                     if epoch == 0:
                         local_optimizer[site].zero_grad()
                         loss = loss_cls
                         loss.backward()
                         local_optimizer[site].step()
-                    else:
-                        l_reg_loss = local_reg_loss(Models, cl_gcn[site], train_loader, Client_site, site)
+                    else:  
+                        l_fvd_loss = local_fvd_loss(Models, cl_gcn[site], train_loader, Client_site, site)
                         l_GM_loss = GM_loss(Models, gm_model[site], train_loader, Client_site, site)
                         
-                        loss = loss_cls + l_reg_loss + 1e-5*l_GM_loss
+                        loss = loss_cls + l_fvd_loss + 1e-5*l_GM_loss
                         loss.requires_grad_(True)
                     
                         local_optimizer[site].zero_grad()
@@ -372,16 +370,16 @@ if __name__ == '__main__':
     parser.add_argument('--step_loss', type=int, default=20, help='Decrease learning rate after how many epochs')
     parser.add_argument('--lr', type=float, default=1e-3, help='Initial learning rate')
     parser.add_argument('--lr_mode', default='step', help='Learning rate policy, step or poly')
-    parser.add_argument('--result_path', default=Path('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/Rest-Meta-MDD-Results/Fed_Reg'), help='Directory to save the results')
+    parser.add_argument('--result_path', default=Path('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/Rest-Meta-MDD-Results/Fed_1'), help='Directory to save the results')
     parser.add_argument('--gpu', default=True, type=lambda x: (str(x).lower() == 'true'), help='Run on CPU or GPU. If TRUE, then GPU.')
-    parser.add_argument('--log_path', default='/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/Rest-Meta-MDD-Results/Fed_Reg')
+    parser.add_argument('--log_path', default='/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/Rest-Meta-MDD-Results/Fed_1')
     parser.add_argument("--local_rank", default=0)
     
     args = parser.parse_args()
-    log_name = 'resnet-attn-scaffold.txt'
+    log_name = 'Resformer-Fed.txt'
     setup_logging(args.log_path, log_name)  
     if not os.path.exists(args.result_path):
         os.mkdir(args.result_path)
-    shutil.copy('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/main/Meta_Fed_GM_Reg.py', args.result_path / 'train.py')
-    shutil.copy('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/main/Resformer.py', args.result_path / ('model.py'))
+    shutil.copy('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/main/pF_VDGM_train.py', args.result_path / 'train.py')
+    shutil.copy('/HOME/scz0abb/run/Fan/Fed-DG-3d/Data/main/Res-former.py', args.result_path / ('model.py'))
     main_worker(args) 
